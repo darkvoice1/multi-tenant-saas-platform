@@ -1,8 +1,10 @@
 ﻿# Frontend (Vue3)
 
-初始化方式（后续执行）：
-- `npm create vite@latest frontend -- --template vue-ts`
-- `cd frontend && npm install`
+## Setup
+1. Install deps
+   - `npm install`
+2. Run dev server
+   - `npm run dev`
 
-目标：
-- TypeScript + Pinia + 权限路由
+## Target
+- TypeScript + Pinia + permission-based routing
