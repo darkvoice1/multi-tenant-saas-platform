@@ -19,7 +19,7 @@ func main() {
 		log.Fatalf("db error: %v", err)
 	}
 
-	router := http.NewRouter(database)
+	router := http.NewRouter(database, cfg)
 	if err := router.Run(cfg.ServerAddr); err != nil {
 		log.Fatalf("server error: %v", err)
 	}

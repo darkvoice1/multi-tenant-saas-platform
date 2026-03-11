@@ -1,4 +1,4 @@
-﻿package models
+package models
 
 import (
 	"time"
@@ -30,28 +30,39 @@ type Org struct {
 
 type User struct {
 	Base
-	TenantID uuid.UUID `gorm:"type:uuid;not null;index"`
-	OrgID    *uuid.UUID `gorm:"type:uuid;index"`
-	Email    string    `gorm:"not null"`
-	Name     string    `gorm:"not null"`
-	Role     string    `gorm:"not null"`
-	Status   string    `gorm:"not null;default:active"`
+	TenantID     uuid.UUID  `gorm:"type:uuid;not null;index"`
+	OrgID        *uuid.UUID `gorm:"type:uuid;index"`
+	Email        string     `gorm:"not null"`
+	Name         string     `gorm:"not null"`
+	Role         string     `gorm:"not null"`
+	Status       string     `gorm:"not null;default:active"`
+	PasswordHash string     `gorm:"type:text"`
+	LastLoginAt  *time.Time
 }
 
 type Project struct {
 	Base
-	TenantID  uuid.UUID `gorm:"type:uuid;not null;index"`
-	OrgID     *uuid.UUID `gorm:"type:uuid;index"`
-	Name      string    `gorm:"not null"`
+	TenantID    uuid.UUID  `gorm:"type:uuid;not null;index"`
+	OrgID       *uuid.UUID `gorm:"type:uuid;index"`
+	Name        string     `gorm:"not null"`
 	Description string
-	CreatedBy *uuid.UUID `gorm:"type:uuid"`
+	CreatedBy   *uuid.UUID `gorm:"type:uuid"`
 }
 
 type Task struct {
 	Base
-	TenantID  uuid.UUID `gorm:"type:uuid;not null;index"`
-	ProjectID uuid.UUID `gorm:"type:uuid;not null;index"`
-	Title     string    `gorm:"not null"`
-	Status    string    `gorm:"not null;default:todo"`
+	TenantID   uuid.UUID  `gorm:"type:uuid;not null;index"`
+	ProjectID  uuid.UUID  `gorm:"type:uuid;not null;index"`
+	Title      string     `gorm:"not null"`
+	Status     string     `gorm:"not null;default:todo"`
 	AssigneeID *uuid.UUID `gorm:"type:uuid"`
+}
+
+type RefreshToken struct {
+	Base
+	TenantID  uuid.UUID `gorm:"type:uuid;not null;index"`
+	UserID    uuid.UUID `gorm:"type:uuid;not null;index"`
+	TokenHash string    `gorm:"type:text;not null;uniqueIndex"`
+	ExpiresAt time.Time `gorm:"not null"`
+	RevokedAt *time.Time
 }
