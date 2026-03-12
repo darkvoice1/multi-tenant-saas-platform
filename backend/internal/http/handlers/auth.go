@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"io"
 	"net/http"
 	"time"
 
@@ -32,6 +33,14 @@ type refreshRequest struct {
 	RefreshToken string `json:"refresh_token" binding:"required"`
 }
 
+type bootstrapRequest struct {
+	TenantName    string `json:"tenant_name"`
+	TenantSlug    string `json:"tenant_slug"`
+	AdminEmail    string `json:"admin_email"`
+	AdminPassword string `json:"admin_password"`
+	AdminName     string `json:"admin_name"`
+}
+
 func issueTokens(db *gorm.DB, cfg config.Config, user models.User) (string, string, int, error) {
 	accessToken, err := auth.CreateAccessToken(cfg.JWTSecret, cfg.AccessTokenTTL, user.ID.String(), user.TenantID.String(), user.Role)
 	if err != nil {
@@ -52,6 +61,81 @@ func issueTokens(db *gorm.DB, cfg config.Config, user models.User) (string, stri
 	}
 
 	return accessToken, refreshToken, int(cfg.AccessTokenTTL.Seconds()), nil
+}
+
+func (h *AuthHandler) Bootstrap(c *gin.Context) {
+	if h.Config.Environment != "dev" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "bootstrap disabled"})
+		return
+	}
+
+	var req bootstrapRequest
+	if err := c.ShouldBindJSON(&req); err != nil && err != io.EOF {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
+	}
+
+	if req.TenantName == "" {
+		req.TenantName = "Demo Tenant"
+	}
+	if req.TenantSlug == "" {
+		req.TenantSlug = "demo"
+	}
+	if req.AdminEmail == "" {
+		req.AdminEmail = "admin@example.com"
+	}
+	if req.AdminPassword == "" {
+		req.AdminPassword = "Admin123!"
+	}
+	if req.AdminName == "" {
+		req.AdminName = "Admin"
+	}
+
+	var count int64
+	if err := h.DB.Model(&models.Tenant{}).Count(&count).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
+		return
+	}
+	if count > 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "already initialized"})
+		return
+	}
+
+	tenant := models.Tenant{
+		Name:   req.TenantName,
+		Slug:   req.TenantSlug,
+		Status: "active",
+	}
+	if err := h.DB.Create(&tenant).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "create tenant failed"})
+		return
+	}
+
+	hash, err := auth.HashPassword(req.AdminPassword)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "hash password failed"})
+		return
+	}
+	user := models.User{
+		TenantID:     tenant.ID,
+		Email:        req.AdminEmail,
+		Name:         req.AdminName,
+		Role:         auth.RoleAdmin,
+		Status:       "active",
+		PasswordHash: hash,
+	}
+	if err := h.DB.Create(&user).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "create user failed"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"tenant_id": tenant.ID.String(),
+		"tenant":    tenant.Name,
+		"email":     user.Email,
+		"password":  req.AdminPassword,
+		"user_id":   user.ID.String(),
+	})
 }
 
 func (h *AuthHandler) Login(c *gin.Context) {

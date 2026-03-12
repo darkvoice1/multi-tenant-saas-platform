@@ -1,0 +1,7 @@
+DROP TABLE IF EXISTS notifications;
+DROP TABLE IF EXISTS task_attachments;
+DROP TABLE IF EXISTS task_approvals;
+DROP TABLE IF EXISTS task_comments;
+
+ALTER TABLE tasks DROP COLUMN IF EXISTS due_at;
+ALTER TABLE tasks DROP COLUMN IF EXISTS priority;

@@ -13,6 +13,10 @@ import (
 )
 
 func main() {
+	if _, err := os.Stat(".env"); err == nil {
+		_ = config.LoadDotEnv(".env")
+	}
+
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("config error: %v", err)

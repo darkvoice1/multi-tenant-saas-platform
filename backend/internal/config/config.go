@@ -14,15 +14,33 @@ type Config struct {
 	JWTSecret       string
 	AccessTokenTTL  time.Duration
 	RefreshTokenTTL time.Duration
+	StorageDir      string
+	StorageBackend  string
+	S3Endpoint      string
+	S3Region        string
+	S3Bucket        string
+	S3AccessKey     string
+	S3SecretKey     string
+	S3UseSSL        bool
+	S3PathStyle     bool
 }
 
 // Load reads configuration from environment variables.
 func Load() (Config, error) {
 	cfg := Config{
-		ServerAddr:  getEnv("SERVER_ADDR", ":8080"),
-		DatabaseURL: os.Getenv("DATABASE_URL"),
-		Environment: getEnv("ENV", "dev"),
-		JWTSecret:   os.Getenv("JWT_SECRET"),
+		ServerAddr:     getEnv("SERVER_ADDR", ":8080"),
+		DatabaseURL:    os.Getenv("DATABASE_URL"),
+		Environment:    getEnv("ENV", "dev"),
+		JWTSecret:      os.Getenv("JWT_SECRET"),
+		StorageDir:     getEnv("STORAGE_DIR", "storage"),
+		StorageBackend: getEnv("STORAGE_BACKEND", "local"),
+		S3Endpoint:     os.Getenv("S3_ENDPOINT"),
+		S3Region:       getEnv("S3_REGION", "us-east-1"),
+		S3Bucket:       getEnv("S3_BUCKET", "saas-platform"),
+		S3AccessKey:    os.Getenv("S3_ACCESS_KEY"),
+		S3SecretKey:    os.Getenv("S3_SECRET_KEY"),
+		S3UseSSL:       getEnvBool("S3_USE_SSL", false),
+		S3PathStyle:    getEnvBool("S3_PATH_STYLE", true),
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -49,6 +67,18 @@ func Load() (Config, error) {
 func getEnv(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
+	}
+	return fallback
+}
+
+func getEnvBool(key string, fallback bool) bool {
+	if v := os.Getenv(key); v != "" {
+		switch v {
+		case "1", "true", "TRUE", "True", "yes", "YES", "Yes", "on", "ON", "On":
+			return true
+		case "0", "false", "FALSE", "False", "no", "NO", "No", "off", "OFF", "Off":
+			return false
+		}
 	}
 	return fallback
 }

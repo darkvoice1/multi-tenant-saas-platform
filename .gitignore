@@ -12,10 +12,13 @@ bin/
 *.exe
 *.test
 *.out
+.cache/
+backend/storage/
 
 # Node
 node_modules/
 dist/
+*.tsbuildinfo
 
 # Logs
 *.log

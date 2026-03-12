@@ -1,7 +1,10 @@
-﻿<template>
+<template>
   <section class="card">
     <h2>登录</h2>
-    <p class="hint">使用已初始化的管理员账号或你自己的账号。</p>
+    <p class="hint">
+      使用已初始化的管理员账号或你自己的账号。
+      <RouterLink class="link" to="/bootstrap">没有账号？去初始化</RouterLink>
+    </p>
     <form @submit.prevent="submit">
       <label>
         租户 ID
@@ -23,10 +26,12 @@
 
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { setSession } from '../auth'
+import { useRouter, useRoute } from 'vue-router'
+import { useSessionStore } from '../stores/session'
 
 const router = useRouter()
+const route = useRoute()
+const session = useSessionStore()
 const loading = ref(false)
 const error = ref('')
 const form = reactive({
@@ -34,6 +39,13 @@ const form = reactive({
   email: '',
   password: ''
 })
+
+if (typeof route.query.tenant === 'string') {
+  form.tenantId = route.query.tenant
+}
+if (typeof route.query.email === 'string') {
+  form.email = route.query.email
+}
 
 async function submit() {
   loading.value = true
@@ -53,7 +65,7 @@ async function submit() {
       throw new Error(data.error || '登录失败')
     }
     const data = await res.json()
-    setSession(data.access_token, data.user.role, data.user.tenant_id)
+    session.setSession(data.access_token, data.user.role, data.user.tenant_id)
     router.push('/dashboard')
   } catch (err: any) {
     error.value = err.message || '登录失败'
@@ -97,5 +109,10 @@ button {
 }
 .hint {
   color: #64748b;
+}
+.link {
+  margin-left: 0.4rem;
+  color: #0f172a;
+  text-decoration: underline;
 }
 </style>
