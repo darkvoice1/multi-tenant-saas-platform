@@ -8,21 +8,23 @@ import (
 
 // Config holds runtime configuration values.
 type Config struct {
-	ServerAddr      string
-	DatabaseURL     string
-	Environment     string
-	JWTSecret       string
-	AccessTokenTTL  time.Duration
-	RefreshTokenTTL time.Duration
-	StorageDir      string
-	StorageBackend  string
-	S3Endpoint      string
-	S3Region        string
-	S3Bucket        string
-	S3AccessKey     string
-	S3SecretKey     string
-	S3UseSSL        bool
-	S3PathStyle     bool
+	ServerAddr       string
+	DatabaseURL      string
+	Environment      string
+	DBLogLevel       string
+	SlowSQLThreshold time.Duration
+	JWTSecret        string
+	AccessTokenTTL   time.Duration
+	RefreshTokenTTL  time.Duration
+	StorageDir       string
+	StorageBackend   string
+	S3Endpoint       string
+	S3Region         string
+	S3Bucket         string
+	S3AccessKey      string
+	S3SecretKey      string
+	S3UseSSL         bool
+	S3PathStyle      bool
 }
 
 // Load reads configuration from environment variables.
@@ -31,6 +33,7 @@ func Load() (Config, error) {
 		ServerAddr:     getEnv("SERVER_ADDR", ":8080"),
 		DatabaseURL:    os.Getenv("DATABASE_URL"),
 		Environment:    getEnv("ENV", "dev"),
+		DBLogLevel:     getEnv("DB_LOG_LEVEL", "warn"),
 		JWTSecret:      os.Getenv("JWT_SECRET"),
 		StorageDir:     getEnv("STORAGE_DIR", "storage"),
 		StorageBackend: getEnv("STORAGE_BACKEND", "local"),
@@ -60,6 +63,12 @@ func Load() (Config, error) {
 	}
 	cfg.AccessTokenTTL = accessTTL
 	cfg.RefreshTokenTTL = refreshTTL
+
+	slowThreshold, err := time.ParseDuration(getEnv("SLOW_SQL_THRESHOLD", "200ms"))
+	if err != nil {
+		return cfg, errors.New("invalid SLOW_SQL_THRESHOLD")
+	}
+	cfg.SlowSQLThreshold = slowThreshold
 
 	return cfg, nil
 }
