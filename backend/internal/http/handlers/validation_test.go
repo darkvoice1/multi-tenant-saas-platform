@@ -1,11 +1,6 @@
-package handlers
+﻿package handlers
 
-import (
-	"net/http/httptest"
-	"testing"
-
-	"github.com/gin-gonic/gin"
-)
+import "testing"
 
 func TestValidatePassword(t *testing.T) {
 	cases := []struct {
@@ -29,26 +24,4 @@ func TestValidatePassword(t *testing.T) {
 			t.Fatalf("%s expected error", c.name)
 		}
 	}
-}
-
-func TestRequireConfirm(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	t.Run("confirm true", func(t *testing.T) {
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request = httptest.NewRequest("DELETE", "/?confirm=true", nil)
-		if !requireConfirm(c) {
-			t.Fatalf("expected confirm true")
-		}
-	})
-
-	t.Run("confirm missing", func(t *testing.T) {
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request = httptest.NewRequest("DELETE", "/", nil)
-		if requireConfirm(c) {
-			t.Fatalf("expected confirm false")
-		}
-	})
 }

@@ -32,27 +32,24 @@ func InitTracer(cfg config.Config) (func(context.Context) error, error) {
 	}
 
 	var spanExporter trace.SpanExporter
-	var shutdown func(context.Context) error
 	if exporter == "stdout" {
 		spanExporter, err = stdouttrace.New(stdouttrace.WithPrettyPrint())
 		if err != nil {
 			return nil, err
 		}
-		shutdown = func(context.Context) error { return nil }
 	} else if exporter == "otlp" {
 		endpoint := strings.TrimSpace(cfg.OTelEndpoint)
 		if endpoint == "" {
 			return nil, fmt.Errorf("OTEL_EXPORTER_OTLP_ENDPOINT is required")
 		}
-		client := otlptracegrpc.NewClient(
+		spanExporter, err = otlptracegrpc.New(
+			context.Background(),
 			otlptracegrpc.WithEndpoint(endpoint),
 			otlptracegrpc.WithInsecure(),
 		)
-		spanExporter, err = otlptracegrpc.New(context.Background(), client)
 		if err != nil {
 			return nil, err
 		}
-		shutdown = spanExporter.Shutdown
 	} else {
 		return nil, fmt.Errorf("unsupported OTEL_EXPORTER: %s", exporter)
 	}

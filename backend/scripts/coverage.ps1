@@ -1,4 +1,4 @@
-﻿param(
+param(
   [int]$MinCoverage = 20
 )
 
@@ -7,13 +7,13 @@ $ErrorActionPreference = "Stop"
 Write-Host "Running tests with coverage..."
 $coverFile = "coverage.out"
 
-go test ./... -coverprofile=$coverFile -covermode=atomic | Write-Host
+go test ./... -coverprofile $coverFile -covermode atomic | Write-Host
 
 if (-not (Test-Path $coverFile)) {
   throw "coverage.out not generated"
 }
 
-$line = go tool cover -func=$coverFile | Select-String -Pattern "total:" | Select-Object -First 1
+$line = go tool cover -func $coverFile | Select-String -Pattern "total:" | Select-Object -First 1
 if (-not $line) {
   throw "Failed to read total coverage"
 }
