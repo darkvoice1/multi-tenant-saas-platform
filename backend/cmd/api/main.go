@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
 
 	"github.com/darkvoice1/multi-tenant-saas-platform/backend/internal/config"
 	"github.com/darkvoice1/multi-tenant-saas-platform/backend/internal/db"
 	"github.com/darkvoice1/multi-tenant-saas-platform/backend/internal/http"
+	"github.com/darkvoice1/multi-tenant-saas-platform/backend/internal/observability"
 	"github.com/darkvoice1/multi-tenant-saas-platform/backend/internal/storage"
 )
 
@@ -19,6 +21,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("config error: %v", err)
 	}
+
+	observability.InitMetrics()
+	shutdown, err := observability.InitTracer(cfg)
+	if err != nil {
+		log.Fatalf("otel error: %v", err)
+	}
+	defer func() {
+		_ = shutdown(context.Background())
+	}()
 
 	database, err := db.Connect(cfg)
 	if err != nil {

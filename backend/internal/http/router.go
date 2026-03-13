@@ -5,6 +5,7 @@ import (
 	"github.com/darkvoice1/multi-tenant-saas-platform/backend/internal/config"
 	"github.com/darkvoice1/multi-tenant-saas-platform/backend/internal/http/handlers"
 	"github.com/darkvoice1/multi-tenant-saas-platform/backend/internal/middleware"
+	"github.com/darkvoice1/multi-tenant-saas-platform/backend/internal/observability"
 	"github.com/darkvoice1/multi-tenant-saas-platform/backend/internal/storage"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -12,9 +13,17 @@ import (
 
 func NewRouter(db *gorm.DB, cfg config.Config, store storage.Storage) *gin.Engine {
 	router := gin.New()
-	router.Use(gin.Logger(), gin.Recovery(), middleware.CORSMiddleware(), middleware.ErrorCodeMiddleware())
+	router.Use(
+		gin.Recovery(),
+		middleware.CORSMiddleware(),
+		middleware.ErrorCodeMiddleware(),
+		middleware.TraceMiddleware(),
+		observability.OTelGinMiddleware(cfg),
+		middleware.RequestLogger(),
+	)
 
 	router.GET("/healthz", handlers.Health)
+	router.GET("/metrics", observability.MetricsHandler())
 
 	authHandler := handlers.NewAuthHandler(db, cfg)
 	oidcHandler := handlers.NewOIDCHandler(db, cfg)

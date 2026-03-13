@@ -1,17 +1,17 @@
 package handlers
 
 import (
-	"io"
-	"net/http"
-	"time"
-
 	"github.com/darkvoice1/multi-tenant-saas-platform/backend/internal/auth"
 	"github.com/darkvoice1/multi-tenant-saas-platform/backend/internal/config"
 	"github.com/darkvoice1/multi-tenant-saas-platform/backend/internal/middleware"
 	"github.com/darkvoice1/multi-tenant-saas-platform/backend/internal/models"
+	"github.com/darkvoice1/multi-tenant-saas-platform/backend/internal/observability"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"io"
+	"net/http"
+	"time"
 )
 
 type AuthHandler struct {
@@ -151,26 +151,31 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	tenantID, err := uuid.Parse(req.TenantID)
 	if err != nil {
+		observability.RecordLogin(false)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid tenant_id"})
 		return
 	}
 
 	var user models.User
 	if err := h.DB.Where("tenant_id = ? AND email = ?", tenantID, req.Email).First(&user).Error; err != nil {
+		observability.RecordLogin(false)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 		return
 	}
 	if user.Status != "active" {
+		observability.RecordLogin(false)
 		c.JSON(http.StatusForbidden, gin.H{"error": "user disabled"})
 		return
 	}
 	if user.PasswordHash == "" || !auth.CheckPassword(user.PasswordHash, req.Password) {
+		observability.RecordLogin(false)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 		return
 	}
 
 	accessToken, refreshToken, expiresIn, err := issueTokens(h.DB, h.Config, user)
 	if err != nil {
+		observability.RecordLogin(false)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "token error"})
 		return
 	}
@@ -179,6 +184,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	h.DB.Model(&user).Updates(map[string]interface{}{
 		"last_login_at": &now,
 	})
+
+	observability.RecordLogin(true)
 
 	c.JSON(http.StatusOK, gin.H{
 		"access_token":  accessToken,
@@ -193,7 +200,6 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		},
 	})
 }
-
 func (h *AuthHandler) Refresh(c *gin.Context) {
 	var req refreshRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

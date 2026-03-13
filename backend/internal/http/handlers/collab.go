@@ -4,6 +4,15 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/darkvoice1/multi-tenant-saas-platform/backend/internal/config"
+	"github.com/darkvoice1/multi-tenant-saas-platform/backend/internal/middleware"
+	"github.com/darkvoice1/multi-tenant-saas-platform/backend/internal/models"
+	"github.com/darkvoice1/multi-tenant-saas-platform/backend/internal/observability"
+	"github.com/darkvoice1/multi-tenant-saas-platform/backend/internal/storage"
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"golang.org/x/image/draw"
+	"gorm.io/gorm"
 	"image"
 	_ "image/gif"
 	_ "image/jpeg"
@@ -14,15 +23,6 @@ import (
 	"path"
 	"strings"
 	"time"
-
-	"github.com/darkvoice1/multi-tenant-saas-platform/backend/internal/config"
-	"github.com/darkvoice1/multi-tenant-saas-platform/backend/internal/middleware"
-	"github.com/darkvoice1/multi-tenant-saas-platform/backend/internal/models"
-	"github.com/darkvoice1/multi-tenant-saas-platform/backend/internal/storage"
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
-	"golang.org/x/image/draw"
-	"gorm.io/gorm"
 )
 
 var errQuotaExceeded = errors.New("quota exceeded")
@@ -472,6 +472,7 @@ func (h *CollabHandler) ApproveTask(c *gin.Context) {
 		return
 	}
 	if status == "approved" {
+		observability.ObserveApprovalDuration(time.Since(task.CreatedAt))
 		h.DB.Model(&task).Update("status", "done")
 	} else {
 		h.DB.Model(&task).Update("status", "in_progress")

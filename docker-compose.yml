@@ -33,7 +33,34 @@
     volumes:
       - redis_data:/data
 
+  prometheus:
+    image: m.daocloud.io/docker.io/prom/prometheus:v2.54.1
+    container_name: saas_platform_prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docs/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+
+  grafana:
+    image: m.daocloud.io/docker.io/grafana/grafana:11.5.2
+    container_name: saas_platform_grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0
+    container_name: saas_platform_jaeger
+    ports:
+      - "16686:16686"
+      - "4317:4317"
+
 volumes:
   db_data:
   minio_data:
   redis_data:
+  grafana_data:

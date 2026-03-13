@@ -26,25 +26,31 @@ type Config struct {
 	S3SecretKey      string
 	S3UseSSL         bool
 	S3PathStyle      bool
+	OTelExporter     string
+	OTelEndpoint     string
+	OTelServiceName  string
 }
 
 // Load reads configuration from environment variables.
 func Load() (Config, error) {
 	cfg := Config{
-		ServerAddr:     getEnv("SERVER_ADDR", ":8080"),
-		DatabaseURL:    os.Getenv("DATABASE_URL"),
-		Environment:    getEnv("ENV", "dev"),
-		DBLogLevel:     getEnv("DB_LOG_LEVEL", "warn"),
-		JWTSecret:      os.Getenv("JWT_SECRET"),
-		StorageDir:     getEnv("STORAGE_DIR", "storage"),
-		StorageBackend: getEnv("STORAGE_BACKEND", "local"),
-		S3Endpoint:     os.Getenv("S3_ENDPOINT"),
-		S3Region:       getEnv("S3_REGION", "us-east-1"),
-		S3Bucket:       getEnv("S3_BUCKET", "saas-platform"),
-		S3AccessKey:    os.Getenv("S3_ACCESS_KEY"),
-		S3SecretKey:    os.Getenv("S3_SECRET_KEY"),
-		S3UseSSL:       getEnvBool("S3_USE_SSL", false),
-		S3PathStyle:    getEnvBool("S3_PATH_STYLE", true),
+		ServerAddr:      getEnv("SERVER_ADDR", ":8080"),
+		DatabaseURL:     os.Getenv("DATABASE_URL"),
+		Environment:     getEnv("ENV", "dev"),
+		DBLogLevel:      getEnv("DB_LOG_LEVEL", "warn"),
+		JWTSecret:       os.Getenv("JWT_SECRET"),
+		StorageDir:      getEnv("STORAGE_DIR", "storage"),
+		StorageBackend:  getEnv("STORAGE_BACKEND", "local"),
+		S3Endpoint:      os.Getenv("S3_ENDPOINT"),
+		S3Region:        getEnv("S3_REGION", "us-east-1"),
+		S3Bucket:        getEnv("S3_BUCKET", "saas-platform"),
+		S3AccessKey:     os.Getenv("S3_ACCESS_KEY"),
+		S3SecretKey:     os.Getenv("S3_SECRET_KEY"),
+		S3UseSSL:        getEnvBool("S3_USE_SSL", false),
+		S3PathStyle:     getEnvBool("S3_PATH_STYLE", true),
+		OTelExporter:    getEnv("OTEL_EXPORTER", "none"),
+		OTelEndpoint:    os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
+		OTelServiceName: getEnv("OTEL_SERVICE_NAME", "saas-platform-api"),
 	}
 
 	if cfg.DatabaseURL == "" {
