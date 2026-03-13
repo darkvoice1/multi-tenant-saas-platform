@@ -2,9 +2,10 @@ package handlers
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
-	_ "image/gif"
 	"image"
+	_ "image/gif"
 	_ "image/jpeg"
 	"image/png"
 	"io"
@@ -22,6 +23,18 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/image/draw"
 	"gorm.io/gorm"
+)
+
+var errQuotaExceeded = errors.New("quota exceeded")
+
+const (
+	maxProjectNameLen  = 120
+	maxProjectDescLen  = 2000
+	maxTaskTitleLen    = 200
+	maxCommentLen      = 2000
+	maxFileSizeBytes   = 20 << 20
+	maxFileNameLen     = 200
+	defaultProjectName = "Untitled"
 )
 
 type CollabHandler struct {
@@ -88,6 +101,30 @@ func (h *CollabHandler) CreateProject(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
 		return
 	}
+
+	req.Name = strings.TrimSpace(req.Name)
+	req.Description = strings.TrimSpace(req.Description)
+	if req.Name == "" {
+		req.Name = defaultProjectName
+	}
+	if !validateLength(req.Name, 1, maxProjectNameLen) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project name", "code": "INVALID_NAME"})
+		return
+	}
+	if len(req.Description) > maxProjectDescLen {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "description too long", "code": "INVALID_DESCRIPTION"})
+		return
+	}
+
+	if err := h.enforceProjectQuota(tenantID); err != nil {
+		if errors.Is(err, errQuotaExceeded) {
+			c.JSON(http.StatusConflict, gin.H{"error": "project quota exceeded", "code": "PROJECT_QUOTA_EXCEEDED"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "quota check failed"})
+		return
+	}
+
 	proj := models.Project{
 		TenantID:    tenantID,
 		Name:        req.Name,
@@ -134,6 +171,17 @@ func (h *CollabHandler) UpdateProject(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
 		return
 	}
+	req.Name = strings.TrimSpace(req.Name)
+	req.Description = strings.TrimSpace(req.Description)
+	if !validateLength(req.Name, 1, maxProjectNameLen) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project name", "code": "INVALID_NAME"})
+		return
+	}
+	if len(req.Description) > maxProjectDescLen {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "description too long", "code": "INVALID_DESCRIPTION"})
+		return
+	}
+
 	var proj models.Project
 	if err := h.DB.Where("tenant_id = ? AND id = ?", tenantID, projectID).First(&proj).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
@@ -151,6 +199,9 @@ func (h *CollabHandler) UpdateProject(c *gin.Context) {
 }
 
 func (h *CollabHandler) DeleteProject(c *gin.Context) {
+	if !requireConfirm(c) {
+		return
+	}
 	tenantID, ok := mustTenantUUID(c)
 	if !ok {
 		return
@@ -204,6 +255,12 @@ func (h *CollabHandler) CreateTask(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
 		return
 	}
+	req.Title = strings.TrimSpace(req.Title)
+	if !validateLength(req.Title, 1, maxTaskTitleLen) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid title", "code": "INVALID_TITLE"})
+		return
+	}
+
 	status := normalizeStatus(req.Status, "todo")
 	priority := normalizePriority(req.Priority)
 	var assignee *uuid.UUID
@@ -273,6 +330,12 @@ func (h *CollabHandler) UpdateTask(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
 		return
 	}
+	req.Title = strings.TrimSpace(req.Title)
+	if !validateLength(req.Title, 1, maxTaskTitleLen) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid title", "code": "INVALID_TITLE"})
+		return
+	}
+
 	var task models.Task
 	if err := h.DB.Where("tenant_id = ? AND id = ?", tenantID, taskID).First(&task).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
@@ -317,6 +380,9 @@ func (h *CollabHandler) UpdateTask(c *gin.Context) {
 }
 
 func (h *CollabHandler) DeleteTask(c *gin.Context) {
+	if !requireConfirm(c) {
+		return
+	}
 	tenantID, ok := mustTenantUUID(c)
 	if !ok {
 		return
@@ -462,6 +528,12 @@ func (h *CollabHandler) CreateComment(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
 		return
 	}
+	req.Content = strings.TrimSpace(req.Content)
+	if !validateLength(req.Content, 1, maxCommentLen) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid content", "code": "INVALID_CONTENT"})
+		return
+	}
+
 	comment := models.TaskComment{
 		TenantID: tenantID,
 		TaskID:   taskID,
@@ -571,7 +643,7 @@ func (h *CollabHandler) UploadAttachment(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "file is required"})
 		return
 	}
-	if file.Size > 20<<20 {
+	if file.Size > maxFileSizeBytes {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "file too large"})
 		return
 	}
@@ -587,8 +659,17 @@ func (h *CollabHandler) UploadAttachment(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "file read failed"})
 		return
 	}
-	if int64(len(data)) > 20<<20 {
+	if int64(len(data)) > maxFileSizeBytes {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "file too large"})
+		return
+	}
+
+	if err := h.enforceStorageQuota(tenantID, int64(len(data))); err != nil {
+		if errors.Is(err, errQuotaExceeded) {
+			c.JSON(http.StatusConflict, gin.H{"error": "storage quota exceeded", "code": "STORAGE_QUOTA_EXCEEDED"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "quota check failed"})
 		return
 	}
 
@@ -596,7 +677,8 @@ func (h *CollabHandler) UploadAttachment(c *gin.Context) {
 	if contentType == "" {
 		contentType = http.DetectContentType(data)
 	}
-	key := buildStorageKey(tenantID, taskID, file.Filename, contentType)
+	fileName := sanitizeFileName(file.Filename)
+	key := buildStorageKey(tenantID, taskID, fileName, contentType)
 	if err := h.Storage.Save(c, key, bytes.NewReader(data), int64(len(data)), contentType); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "storage save failed"})
 		return
@@ -615,7 +697,7 @@ func (h *CollabHandler) UploadAttachment(c *gin.Context) {
 		TenantID:    tenantID,
 		TaskID:      taskID,
 		UploaderID:  userID,
-		FileName:    file.Filename,
+		FileName:    fileName,
 		ContentType: contentType,
 		SizeBytes:   int64(len(data)),
 		Path:        key,
@@ -713,6 +795,44 @@ func (h *CollabHandler) taskExists(tenantID, taskID uuid.UUID) bool {
 	return count > 0
 }
 
+func (h *CollabHandler) enforceProjectQuota(tenantID uuid.UUID) error {
+	var tenant models.Tenant
+	if err := h.DB.Select("id", "max_projects").Where("id = ?", tenantID).First(&tenant).Error; err != nil {
+		return err
+	}
+	if tenant.MaxProjects <= 0 {
+		return nil
+	}
+	var count int64
+	if err := h.DB.Model(&models.Project{}).Where("tenant_id = ?", tenantID).Count(&count).Error; err != nil {
+		return err
+	}
+	if count >= int64(tenant.MaxProjects) {
+		return errQuotaExceeded
+	}
+	return nil
+}
+
+func (h *CollabHandler) enforceStorageQuota(tenantID uuid.UUID, incoming int64) error {
+	var tenant models.Tenant
+	if err := h.DB.Select("id", "max_storage_bytes").Where("id = ?", tenantID).First(&tenant).Error; err != nil {
+		return err
+	}
+	if tenant.MaxStorageBytes <= 0 {
+		return nil
+	}
+	var used int64
+	if err := h.DB.Model(&models.TaskAttachment{}).
+		Select("COALESCE(SUM(size_bytes),0)").Where("tenant_id = ?", tenantID).
+		Scan(&used).Error; err != nil {
+		return err
+	}
+	if used+incoming > tenant.MaxStorageBytes {
+		return errQuotaExceeded
+	}
+	return nil
+}
+
 func mustTenantUUID(c *gin.Context) (uuid.UUID, bool) {
 	id, ok := middleware.TenantID(c)
 	if !ok {
@@ -739,6 +859,15 @@ func mustUserUUID(c *gin.Context) (uuid.UUID, bool) {
 		return uuid.UUID{}, false
 	}
 	return uid, true
+}
+
+func requireConfirm(c *gin.Context) bool {
+	confirm := strings.ToLower(strings.TrimSpace(c.Query("confirm")))
+	if confirm == "true" || confirm == "1" || confirm == "yes" {
+		return true
+	}
+	c.JSON(http.StatusBadRequest, gin.H{"error": "confirm required", "code": "CONFIRM_REQUIRED"})
+	return false
 }
 
 func normalizeStatus(status, fallback string) string {
@@ -794,11 +923,18 @@ func fileExtFrom(filename, contentType string) string {
 }
 
 func sanitizeFileName(name string) string {
+	name = strings.ReplaceAll(name, "\\", "/")
+	name = path.Base(name)
 	name = strings.ReplaceAll(name, "\"", "")
 	name = strings.ReplaceAll(name, "\n", "")
 	name = strings.ReplaceAll(name, "\r", "")
+	name = strings.ReplaceAll(name, "\t", "")
+	name = strings.ReplaceAll(name, "..", "")
 	if name == "" {
 		return "attachment"
+	}
+	if len(name) > maxFileNameLen {
+		return name[:maxFileNameLen]
 	}
 	return name
 }
@@ -876,4 +1012,9 @@ func parseMentions(content string) []string {
 		}
 	}
 	return mentions
+}
+
+func validateLength(value string, min, max int) bool {
+	l := len(value)
+	return l >= min && l <= max
 }

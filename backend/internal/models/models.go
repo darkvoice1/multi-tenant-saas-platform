@@ -17,9 +17,13 @@ type Base struct {
 
 type Tenant struct {
 	Base
-	Name   string `json:"name" gorm:"not null"`
-	Slug   string `json:"slug" gorm:"not null;uniqueIndex"`
-	Status string `json:"status" gorm:"not null;default:active"`
+	Name                 string `json:"name" gorm:"not null"`
+	Slug                 string `json:"slug" gorm:"not null;uniqueIndex"`
+	Status               string `json:"status" gorm:"not null;default:active"`
+	MaxProjects          int    `json:"max_projects" gorm:"not null;default:100"`
+	MaxMembers           int    `json:"max_members" gorm:"not null;default:100"`
+	MaxStorageBytes      int64  `json:"max_storage_bytes" gorm:"not null;default:1073741824"`
+	MaxRequestsPerMinute int    `json:"max_requests_per_minute" gorm:"not null;default:600"`
 }
 
 type Org struct {
@@ -62,10 +66,10 @@ type Task struct {
 
 type RefreshToken struct {
 	Base
-	TenantID  uuid.UUID `json:"tenant_id" gorm:"type:uuid;not null;index"`
-	UserID    uuid.UUID `json:"user_id" gorm:"type:uuid;not null;index"`
-	TokenHash string    `json:"-" gorm:"type:text;not null;uniqueIndex"`
-	ExpiresAt time.Time `json:"expires_at" gorm:"not null"`
+	TenantID  uuid.UUID  `json:"tenant_id" gorm:"type:uuid;not null;index"`
+	UserID    uuid.UUID  `json:"user_id" gorm:"type:uuid;not null;index"`
+	TokenHash string     `json:"-" gorm:"type:text;not null;uniqueIndex"`
+	ExpiresAt time.Time  `json:"expires_at" gorm:"not null"`
 	RevokedAt *time.Time `json:"revoked_at,omitempty"`
 }
 
@@ -100,9 +104,23 @@ type TaskAttachment struct {
 
 type Notification struct {
 	Base
-	TenantID uuid.UUID `json:"tenant_id" gorm:"type:uuid;not null;index"`
-	UserID   uuid.UUID `json:"user_id" gorm:"type:uuid;not null;index"`
-	Type     string    `json:"type" gorm:"not null"`
-	Message  string    `json:"message" gorm:"type:text;not null"`
+	TenantID uuid.UUID  `json:"tenant_id" gorm:"type:uuid;not null;index"`
+	UserID   uuid.UUID  `json:"user_id" gorm:"type:uuid;not null;index"`
+	Type     string     `json:"type" gorm:"not null"`
+	Message  string     `json:"message" gorm:"type:text;not null"`
 	ReadAt   *time.Time `json:"read_at,omitempty"`
+}
+
+type AuditLog struct {
+	Base
+	TenantID   uuid.UUID  `json:"tenant_id" gorm:"type:uuid;not null;index"`
+	UserID     uuid.UUID  `json:"user_id" gorm:"type:uuid;not null;index"`
+	Action     string     `json:"action" gorm:"not null"`
+	Resource   string     `json:"resource" gorm:"not null"`
+	ResourceID *uuid.UUID `json:"resource_id,omitempty" gorm:"type:uuid"`
+	Method     string     `json:"method" gorm:"not null"`
+	Path       string     `json:"path" gorm:"not null"`
+	StatusCode int        `json:"status_code" gorm:"not null"`
+	IP         string     `json:"ip" gorm:"type:text"`
+	UserAgent  string     `json:"user_agent" gorm:"type:text"`
 }

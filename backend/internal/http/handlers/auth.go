@@ -90,6 +90,10 @@ func (h *AuthHandler) Bootstrap(c *gin.Context) {
 	if req.AdminName == "" {
 		req.AdminName = "Admin"
 	}
+	if err := validatePassword(req.AdminPassword); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	var count int64
 	if err := h.DB.Model(&models.Tenant{}).Count(&count).Error; err != nil {

@@ -12,7 +12,7 @@ import (
 
 func NewRouter(db *gorm.DB, cfg config.Config, store storage.Storage) *gin.Engine {
 	router := gin.New()
-	router.Use(gin.Logger(), gin.Recovery(), middleware.CORSMiddleware())
+	router.Use(gin.Logger(), gin.Recovery(), middleware.CORSMiddleware(), middleware.ErrorCodeMiddleware())
 
 	router.GET("/healthz", handlers.Health)
 
@@ -20,6 +20,7 @@ func NewRouter(db *gorm.DB, cfg config.Config, store storage.Storage) *gin.Engin
 	oidcHandler := handlers.NewOIDCHandler(db, cfg)
 	collabHandler := handlers.NewCollabHandler(db, cfg, store)
 	dashboardHandler := handlers.NewDashboardHandler(db, cfg)
+	adminHandler := handlers.NewAdminHandler(db)
 	router.POST("/auth/bootstrap", authHandler.Bootstrap)
 	router.POST("/auth/login", authHandler.Login)
 	router.POST("/auth/refresh", authHandler.Refresh)
@@ -32,8 +33,12 @@ func NewRouter(db *gorm.DB, cfg config.Config, store storage.Storage) *gin.Engin
 	api := router.Group("/api")
 	api.Use(middleware.TenantMiddleware(true))
 	api.Use(middleware.AuthMiddleware(cfg.JWTSecret))
+	api.Use(middleware.AuditLogger(db))
+	api.Use(middleware.RateLimit(db))
 	api.GET("/tenant/echo", handlers.TenantEcho)
-	api.GET("/admin/ping", middleware.RequireRoles(auth.RoleAdmin), handlers.AdminPing)
+	api.GET("/admin/ping", middleware.RequireRoles(auth.RoleAdmin), adminHandler.Ping)
+	api.GET("/admin/audit-logs", middleware.RequireRoles(auth.RoleAdmin), adminHandler.ListAuditLogs)
+	api.POST("/admin/users", middleware.RequireRoles(auth.RoleAdmin), adminHandler.CreateUser)
 	api.GET("/dashboard", middleware.RequirePermission(auth.PermProjectRead), dashboardHandler.Get)
 
 	projects := api.Group("/projects")

@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -51,6 +52,11 @@ func Load() (Config, error) {
 	}
 	if cfg.JWTSecret == "" {
 		return cfg, errors.New("JWT_SECRET is required")
+	}
+	if cfg.Environment != "dev" {
+		if len(cfg.JWTSecret) < 16 || strings.EqualFold(cfg.JWTSecret, "dev_change_me") {
+			return cfg, errors.New("JWT_SECRET is too weak")
+		}
 	}
 
 	accessTTL, err := time.ParseDuration(getEnv("ACCESS_TOKEN_TTL", "15m"))
