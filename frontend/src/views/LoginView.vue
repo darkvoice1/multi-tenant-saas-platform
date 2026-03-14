@@ -28,6 +28,7 @@
 import { reactive, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useSessionStore } from '../stores/session'
+import { API_BASE } from '../api'
 
 const router = useRouter()
 const route = useRoute()
@@ -51,7 +52,7 @@ async function submit() {
   loading.value = true
   error.value = ''
   try {
-    const res = await fetch('http://localhost:8080/auth/login', {
+    const res = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

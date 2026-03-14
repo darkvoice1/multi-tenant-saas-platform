@@ -1,4 +1,9 @@
-export const API_BASE = 'http://localhost:8080'
+const runtimeBase =
+  typeof window !== 'undefined'
+    ? `${window.location.protocol}//${window.location.hostname}:8080`
+    : ''
+
+export const API_BASE = (import.meta.env.VITE_API_BASE as string) || runtimeBase || 'http://localhost:8080'
 
 type ApiError = { error?: string }
 
