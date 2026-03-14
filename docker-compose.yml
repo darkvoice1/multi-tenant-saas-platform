@@ -1,4 +1,4 @@
-﻿services:
+services:
   db:
     image: postgres:16
     container_name: saas_platform_db
@@ -10,6 +10,11 @@
       POSTGRES_DB: saas_platform
     volumes:
       - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   minio:
     image: m.daocloud.io/docker.io/minio/minio:RELEASE.2025-01-20T14-49-07Z
@@ -58,6 +63,35 @@
     ports:
       - "16686:16686"
       - "4317:4317"
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: saas_platform_api
+    ports:
+      - "8080:8080"
+    env_file:
+      - ./backend/.env.${APP_ENV:-dev}
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      redis:
+        condition: service_started
+      jaeger:
+        condition: service_started
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: saas_platform_web
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
 
 volumes:
   db_data:
